@@ -1,0 +1,267 @@
+import { useState, useEffect, useRef } from 'react';
+import './App.css';
+
+function App() {
+  return (
+    <div className="App">
+      <TwentyfiveClock />
+    </div>
+  );
+}
+
+// ACCURATE TIMER FUNCTION // 
+
+const accurateInterval = function (fn, time) {
+  var cancel, nextAt, timeout, wrapper;
+  nextAt = new Date().getTime() + time;
+  timeout = null;
+  wrapper = function () {
+    nextAt += time;
+    timeout = setTimeout(wrapper, nextAt - new Date().getTime());
+    return fn();
+  };
+  cancel = function () {
+    return clearTimeout(timeout);
+  };
+  timeout = setTimeout(wrapper, nextAt - new Date().getTime());
+  return {
+    cancel: cancel
+  };
+};
+
+const Key = (props) => {
+  function handleClick() {
+    props.keyClicked(props.keyId);
+  };
+
+  return (
+    <div className={props.style} id={props.keyId} onClick={handleClick}>
+      {props.keyText}
+    </div>
+  );
+}
+
+const Display = (props) => {
+  return (
+    <div className={props.buttonName} id={props.keyId}>
+      {props.msg}
+    </div>
+  );
+}
+
+const TwentyfiveClock = () => {
+  const [sessionDisplay, setSessionDisplay] = useState("Session");
+  const [breakTime, setbreakTime] = useState(5);
+  const [sessionTime, setsessionTime] = useState(25);
+  const [clockState, setclockState] = useState('');
+  const [timeLeft, settimeLeft] = useState(25 * 60);
+  const [intervalObj, setintervalObj] = useState(null);
+  const [timeLeftDisplay, setTimeLeftDisplay] = useState("25:00");
+
+  const stopClicked = () => { setclockState("stopped") };
+  const playpauseClicked = () => {
+    const isChanged = clockState === "play" ? "pause" : "play";
+    setclockState(isChanged);
+  };
+
+  const timeLeftRef = useRef(timeLeft);
+  const sessionDisplayRef = useRef(sessionDisplay);
+  const timeLeftDisplayRef = useRef(timeLeftDisplay);
+  const sessionTimeRef = useRef(25);
+
+
+  const cleanMinutes = () => {
+    sessionTimeRef.current = 25;
+    setsessionTime(sessionTimeRef.current);
+    sessionDisplayRef.current = sessionTimeRef.current;
+   
+    timeLeftRef.current = sessionTimeRef.current * 60;
+    settimeLeft(timeLeftRef.current);
+
+    timeLeftDisplayRef.current = formatTime(timeLeftRef.current);
+    setTimeLeftDisplay(timeLeftDisplayRef.current);
+
+    setbreakTime(5);
+    setSessionDisplay("Session");
+  }
+
+  const switchDisplay = () => {
+    console.log('swithcDisplay s=' + sessionTimeRef.current + ' b=' + breakTime + ' dispRef=' + sessionDisplayRef.current);
+
+    const nextDisplay = sessionDisplayRef.current === "Session" ? "Break" : "Session";
+    const nextSecond = (nextDisplay === "Session" ? sessionTimeRef.current : breakTime) * 60;
+
+    sessionDisplayRef.current = nextDisplay;
+    setSessionDisplay(nextDisplay);
+
+    timeLeftRef.current = nextSecond;
+    settimeLeft(nextSecond);
+
+    timeLeftDisplayRef.current = formatTime(nextSecond);
+    setTimeLeftDisplay(timeLeftDisplayRef.current);
+
+    console.log('swithcDisplay timeleft=' + timeLeftRef.current);
+
+  }
+
+  const runTime = () => {
+    console.log('runTime timeleft=' + timeLeftRef.current);
+    timeLeftRef.current--;
+    settimeLeft(timeLeftRef.current);
+
+    timeLeftDisplayRef.current = formatTime(timeLeftRef.current);
+    setTimeLeftDisplay(timeLeftDisplayRef.current);
+
+    console.log('runTime timeleft=' + timeLeftRef.current + ' dr=' + timeLeftDisplayRef.current);
+  }
+
+  const playSound = () => {
+    console.log('PlaySound');
+    const sound = document.getElementById("beep");
+    sound.currentTime = 0;
+    sound.play();
+  }
+
+
+  useEffect(() => {
+    console.log('useEffect ' + clockState);
+    if (clockState == "") return;
+    if (clockState == "stopped") {
+      console.log('stopped');
+      if (intervalObj !== null) {
+        intervalObj.cancel();
+        setintervalObj(null);
+      }
+      cleanMinutes();
+    }
+    if (clockState == "play") {
+      console.log('play');
+      if (intervalObj === null) {
+        runTime();
+        let id = accurateInterval(() => {
+          console.log('AccurateInterval');
+
+          if (timeLeftRef.current == 0) {
+            switchDisplay();
+            playSound();
+          }
+          runTime();
+        }, 1000);
+
+        setintervalObj(id);
+      }
+    }
+    if (clockState == "pause") {
+      console.log('pause');
+      if (intervalObj !== null) {
+        intervalObj.cancel();
+        setintervalObj(null);
+      }
+    }
+  }, [clockState]);
+
+  const incrementBreak = () => {
+    console.log('IncrementBreak');
+    if (clockState == "stopped" || clockState == "" || clockState == "pause") {
+      if (breakTime == 60) {
+        return;
+      } else {
+        setbreakTime(breakTime + 1);
+      }
+    }
+    return;
+  }
+
+  const IncrementDecrement = (value) => {
+    sessionTimeRef.current = sessionTimeRef.current + value;
+    setsessionTime(sessionTimeRef.current)
+    timeLeftRef.current = sessionTimeRef.current * 60;
+    settimeLeft(timeLeftRef.current);
+    timeLeftDisplayRef.current = formatTime(timeLeftRef.current);
+    setTimeLeftDisplay(timeLeftDisplayRef.current);
+    console.log("increment.decrement =" + "sessiontimeref =" + sessionTimeRef.current + "timeleftref" + timeLeftRef.current + "timeleftdisplay" + timeLeftDisplayRef.current);
+  }
+
+  const incrementSession = () => {
+    console.log('incrementSession');
+    if (clockState == "stopped" || clockState == "" || clockState == "pause") {
+      if (sessionTimeRef.current == 60) {
+        return;
+      } else {
+        IncrementDecrement(1);
+      }
+    }
+  }
+
+  const decrementBreak = () => {
+    console.log('DecrementBreak');
+    if (clockState == "stopped" || clockState == "" || clockState == "pause") {
+      if (breakTime == 1) {
+        return;
+      } else {
+        setbreakTime(breakTime - 1);
+      }
+    }
+  }
+
+  const decrementSession = () => {
+    console.log('DecrementSession');
+    if (clockState == "stopped" || clockState == "" || clockState == "pause") {
+      if (sessionTimeRef.current == 1) {
+        return;
+      } else {
+        IncrementDecrement(-1);
+      }
+    }
+  }
+
+  const formatTime = (value) => {
+    console.log('FormatTime ' + value);
+    let minutes = Math.floor(value / 60);
+    let seconds = value % 60;
+    if (minutes < 10) minutes = "0" + minutes;
+    if (seconds < 10) seconds = "0" + seconds;
+    return minutes + ":" + seconds;
+  }
+
+
+  return (
+    <section className='page-container'>
+      <div className='clock-container'>
+        <div className='settings-container'>
+          <div className='items-display'>
+            <h4 className='sub-title' id="break-label">Break Length</h4>
+            <div className='keys-container'>
+              <Key style="fa-solid fa-plus my-key" keyClicked={incrementBreak} keyId="break-increment" />
+              <Display buttonName="display-session my-display" msg={breakTime} keyId="break-length" />
+              <Key style="fa-solid fa-minus my-key" keyClicked={decrementBreak}
+                keyId="break-decrement" />
+            </div>
+          </div>
+          <div className='items-display'>
+            <h4 className='sub-title' id="session-label">Session Length</h4>
+            <div className='keys-container'>
+              <Key style="fa-solid fa-plus my-key" keyClicked={incrementSession}
+                keyId="session-increment" />
+              <Display buttonName="display-session my-display" msg={sessionTime} keyId="session-length" />
+              <Key style="fa-solid fa-minus my-key" keyClicked={decrementSession} keyId="session-decrement" />
+            </div>
+          </div>
+        </div>
+        <h4 className="sub-title" id="timer-label">{sessionDisplay}</h4>
+        <div className='timer-session-container'>
+          <h2>
+            <Display buttonName="timer-session" msg={timeLeftDisplay} keyId="time-left" />
+          </h2>
+        </div>
+        <div className='keys-container'>
+          <Key style="fa-solid fa-play my-key" keyClicked={playpauseClicked} keyId="start_stop" />
+          <Key style="fa-solid fa-pause my-key" keyClicked={stopClicked} keyId="reset" />
+        </div>
+        <audio id="beep" src="https://sampleswap.org/samples-ghost/SOUND%20EFFECTS%20and%20NOISES/Electro%20and%20Synthetic/192[kb]clock_radio_alarm.wav.mp3">Your browser does not support the audio element.</audio>
+      </div>
+    </section>
+  );
+}
+
+export default App;
